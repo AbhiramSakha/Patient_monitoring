@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+<title>MediGuard ICU – Dashboard</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+<style>
+    body {
+        background:#081025;
+        color:#e6eef8;
+        font-family:"JetBrains Mono", monospace;
+    }
+
+    .patient-card {
+        background:rgba(18,25,38,0.85);
+        border-radius:12px;
+        overflow:hidden;
+        position:relative;
+        border:1px solid rgba(255,255,255,0.05);
+        transition:transform .15s;
+    }
+
+    .patient-card:hover {
+        transform:scale(1.02);
+    }
+
+    .live-tag {
+        position:absolute;
+        left:8px; top:8px;
+        background:#ef4444;
+        color:white;
+        padding:4px 8px;
+        font-size:11px;
+        border-radius:6px;
+        font-weight:700;
+    }
+
+    /* Alert Colors */
+    .alert-fall      { border:2px solid #ff3b3b; box-shadow:0 0 12px #ff1e1e; }
+    .alert-pain      { border:2px solid #ff9a1f; box-shadow:0 0 12px #ff7b00; }
+    .alert-panic     { border:2px solid #ff00ff; box-shadow:0 0 12px #ff00dd; }
+    .alert-feverish  { border:2px solid #ff5e00; box-shadow:0 0 12px #ff8b3a; }
+    .alert-weak      { border:2px solid #f59e0b; box-shadow:0 0 12px #fbbf24; }
+    .alert-exhausted { border:2px solid #a78bfa; box-shadow:0 0 12px #8b5cf6; }
+    .alert-safe      { border:2px solid #10b981; box-shadow:0 0 10px #059669; }
+
+    .alert-text {
+        padding:6px;
+        font-size:12px;
+        text-align:center;
+        font-weight:700;
+    }
+</style>
+</head>
+
+<body>
+
+<header class="flex justify-between items-center px-6 py-5">
+    <h1 class="text-2xl font-bold flex items-center gap-3">
+        <i class="fas fa-hospital-user text-yellow-400"></i>
+        ICU Nurse Monitoring Dashboard
+    </h1>
+
+    <button onclick="location.href='/'"
+            class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">
+        Single Patient View
+    </button>
+</header>
+
+<main class="px-6 pb-8">
+    <div id="grid" class="grid grid-cols-4 gap-6"></div>
+</main>
+
+<script>
+const grid = document.getElementById("grid");
+
+/* ---------------- Create 16 Cards ---------------- */
+function createTiles() {
+    let html = "";
+    for (let i = 1; i <= 16; i++) {
+        html += `
+        <div id="card-${i}" class="patient-card alert-safe">
+
+            <div class="live-tag">LIVE</div>
+
+            <img id="vid-${i}" src="/video/${i}"
+                 class="w-full h-40 object-cover rounded"/>
+
+            <div class="p-3">
+                <div id="name-${i}" class="font-bold text-lg">Patient ${i}</div>
+
+                <div id="room-${i}" class="text-sm text-gray-300">
+                    Room: ICU-${i}
+                </div>
+
+                <div id="alert-${i}"
+                     class="alert-text mt-2 text-green-400">
+                    SAFE
+                </div>
+
+                <button onclick="location.href='/patient/${i}'"
+                        class="mt-2 bg-blue-600 px-3 py-1 rounded text-sm hover:bg-blue-700">
+                    View
+                </button>
+            </div>
+        </div>`;
+    }
+    grid.innerHTML = html;
+}
+
+createTiles();
+
+/* ---------------- Update Dashboard ---------------- */
+function updateDash() {
+    fetch("/api/dashboard")
+        .then(res => res.json())
+        .then(data => {
+            data.forEach(p => {
+                document.getElementById(`name-${p.id}`).innerText = p.name;
+                document.getElementById(`room-${p.id}`).innerText = "Room: " + p.room;
+
+                const card = document.getElementById(`card-${p.id}`);
+                const atxt = document.getElementById(`alert-${p.id}`);
+
+                /* Reset card style */
+                card.className = "patient-card";
+
+                /* Apply alert type */
+                const alert = p.alert.toUpperCase();
+
+                if (alert === "SAFE") {
+                    card.classList.add("alert-safe");
+                    atxt.innerText = "SAFE";
+                    atxt.className = "alert-text text-green-300";
+                }
+                else {
+                    card.classList.add(`alert-${alert.toLowerCase()}`);
+                    atxt.innerText = alert + " ALERT";
+                    atxt.className = "alert-text text-red-300";
+                }
+            });
+        });
+}
+
+setInterval(updateDash, 400);
+</script>
+
+</body>
+</html>

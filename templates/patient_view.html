@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<title>MediGuard ICU – Patient View</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+<style>
+    body {
+        background: #0f0f11;
+        font-family: "JetBrains Mono", monospace;
+        color: #dce2eb;
+    }
+    .panel {
+        background: rgba(30, 31, 36, 0.8);
+        border-radius: 14px;
+        padding: 18px;
+        border: 1px solid rgba(255,255,255,0.05);
+    }
+    .flash {
+        animation: glow 0.4s infinite alternate;
+    }
+    @keyframes glow {
+        from { box-shadow: 0 0 10px #ff1e00; }
+        to   { box-shadow: 0 0 25px #ff1e00; }
+    }
+</style>
+
+</head>
+
+<body>
+
+<header class="flex justify-between items-center px-6 py-5">
+    <h1 class="text-2xl font-bold flex items-center gap-3">
+        <i class="fas fa-heartbeat text-red-500"></i>
+        MediGuard <span class="text-yellow-400">ICU</span>
+    </h1>
+
+    <button onclick="location.href='/dashboard'"
+            class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">
+        <i class="fas fa-th-large"></i> Dashboard
+    </button>
+</header>
+
+<main class="px-6 grid grid-cols-12 gap-6">
+
+    <!-- Video -->
+    <section id="video-panel"
+             class="col-span-8 panel relative h-[70vh] overflow-hidden">
+
+        <img src="/video/{{ patient_id }}"
+             class="w-full h-full object-cover rounded-lg"/>
+
+        <div class="absolute top-3 left-3 bg-red-600 px-3 py-1 text-xs font-bold rounded">
+            LIVE
+        </div>
+    </section>
+
+    <!-- Right Side -->
+    <aside class="col-span-4 flex flex-col gap-6">
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Patient Profile</div>
+            <div class="text-xl font-bold mt-2">Patient {{ patient_id }}</div>
+            <div id="age"  class="text-gray-300">Age: --</div>
+            <div id="room" class="text-gray-300">Room: ICU-{{ patient_id }}</div>
+        </div>
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Emotion</div>
+            <div id="emotion" class="text-3xl font-bold mt-2">--</div>
+            <div id="emoji" class="text-5xl">😐</div>
+        </div>
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Status</div>
+            <div id="alert-box"
+                 class="bg-green-900/30 border border-green-500/40 p-4 rounded text-center mt-2">
+                <span id="alert-text" class="font-bold text-green-400">
+                    PATIENT SAFE
+                </span>
+            </div>
+        </div>
+
+    </aside>
+
+</main>
+
+<script>
+async function update() {
+    const v = await fetch("/api/vitals/{{ patient_id }}").then(r => r.json());
+
+    document.getElementById("emotion").innerText = v.emotion;
+    document.getElementById("emoji").innerText =
+        {happy:"😊", sad:"😢", angry:"😠", fear:"😨", neutral:"😐"}[v.emotion] || "😐";
+
+    let alert = v.alert.toUpperCase();
+    let box = document.getElementById("alert-box");
+    let text = document.getElementById("alert-text");
+
+    text.innerText = alert + " ALERT";
+
+    // Remove old classes
+    box.classList.remove("flash");
+
+    if (alert === "SAFE") {
+        text.className = "font-bold text-green-400";
+        box.className = "bg-green-900/30 border border-green-500/40 p-4 rounded text-center mt-2";
+    }
+    else {
+        text.className = "font-bold text-red-400";
+        box.className = "bg-red-900/30 border border-red-500/40 p-4 rounded text-center mt-2 flash";
+    }
+}
+
+setInterval(update, 800);
+</script>
+
+</body>
+</html>

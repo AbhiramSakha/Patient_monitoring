@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<title>MediGuard ICU – Patient Monitor</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+<style>
+    body {
+        background: linear-gradient(180deg, #0b1524, #0f1c33);
+        font-family: "JetBrains Mono", monospace;
+        color: #dce2eb;
+    }
+    .panel {
+        background: rgba(25, 35, 55, 0.75);
+        border-radius: 14px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(8px);
+    }
+    .alert-flash {
+        animation: flash 0.40s infinite;
+    }
+    @keyframes flash {
+        0% { box-shadow: 0 0 20px #ff1e00; }
+        50% { box-shadow: 0 0 40px #ff1e00; }
+        100% { box-shadow: 0 0 20px #ff1e00; }
+    }
+</style>
+</head>
+
+<body>
+
+<!-- AUDIO (still plays but no popup) -->
+<audio id="a-fall" src="/static/voice/fall.mp3"></audio>
+<audio id="a-pain" src="/static/voice/pain.mp3"></audio>
+<audio id="a-panic" src="/static/voice/panic.mp3"></audio>
+<audio id="a-fever" src="/static/voice/fever.mp3"></audio>
+<audio id="a-weak" src="/static/voice/weak.mp3"></audio>
+<audio id="a-ex" src="/static/voice/exhausted.mp3"></audio>
+<audio id="a-safe" src="/static/voice/safe.mp3"></audio>
+
+<!-- HEADER -->
+<header class="flex justify-between items-center px-6 py-5">
+    <h1 class="text-2xl font-bold flex items-center gap-3">
+        <i class="fas fa-heartbeat text-red-500"></i>
+        MediGuard <span class="text-yellow-400">ICU</span>
+    </h1>
+
+    <button onclick="location.href='/dashboard'"
+            class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700">
+        <i class="fas fa-th-large"></i> Dashboard View
+    </button>
+</header>
+
+<!-- MAIN GRID -->
+<main class="px-6 grid grid-cols-12 gap-6">
+
+    <!-- VIDEO PANEL -->
+    <section id="video-panel"
+             class="col-span-8 panel relative h-[74vh] overflow-hidden">
+
+        <div class="absolute top-3 left-3 bg-red-600 px-3 py-1 text-xs font-bold rounded">
+            LIVE
+        </div>
+
+        <img id="video-feed" src="/video/1"
+             class="w-full h-full object-cover rounded-lg" />
+
+        <!-- Controls -->
+        <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4
+                    bg-black/40 p-3 rounded-xl">
+
+            <input type="file" id="file-input" class="hidden" accept="video/*">
+
+            <button id="upload-btn"
+                    class="bg-green-600 w-12 h-12 flex items-center justify-center rounded-lg">
+                <i class="fas fa-upload"></i>
+            </button>
+
+            <button id="cam-btn"
+                    class="bg-blue-600 w-12 h-12 flex items-center justify-center rounded-lg">
+                <i class="fas fa-video"></i>
+            </button>
+
+            <button id="pause-btn"
+                    class="bg-yellow-500 w-12 h-12 flex items-center justify-center rounded-lg">
+                <i id="pause-icon" class="fas fa-pause text-black"></i>
+            </button>
+
+        </div>
+    </section>
+
+    <!-- RIGHT PANELS -->
+    <aside class="col-span-4 flex flex-col gap-6">
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Patient Profile</div>
+            <div id="pname" class="text-xl font-bold mt-2">Patient 1</div>
+            <div id="page"  class="text-gray-300 mt-1">Age: 21</div>
+            <div id="proom" class="text-gray-300">Room: ICU-1</div>
+        </div>
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Emotion</div>
+            <div id="emotion" class="text-3xl font-bold mt-2">--</div>
+            <div id="emoji" class="text-5xl">😐</div>
+        </div>
+
+        <div class="panel">
+            <div class="text-xs text-gray-400 uppercase">Status</div>
+            <div id="alert-box"
+                 class="bg-green-900/30 border border-green-500/40 p-4 rounded text-center mt-2">
+                <div id="alert-text" class="font-bold text-green-400">PATIENT SAFE</div>
+            </div>
+        </div>
+
+        <div class="panel max-h-60 overflow-y-auto text-sm" id="history">
+            Loading...
+        </div>
+
+    </aside>
+</main>
+
+<script>
+/* -------------------- ALERT DELAY LOGIC -------------------- */
+let firstLoad = true;
+let alertStart = null;
+const DELAY = 5000; // 5 seconds delay
+
+let alarmPlaying = false;
+
+/* -------------------- DOM ELEMENTS -------------------- */
+const api = "/api/vitals/1";
+const videoFeed = document.getElementById("video-feed");
+const videoPanel = document.getElementById("video-panel");
+const alertBox = document.getElementById("alert-box");
+const alertText = document.getElementById("alert-text");
+
+/* -------------------- AUDIO -------------------- */
+const sounds = {
+    FALL:  document.getElementById("a-fall"),
+    PAIN:  document.getElementById("a-pain"),
+    PANIC: document.getElementById("a-panic"),
+    FEVERISH: document.getElementById("a-fever"),
+    WEAK: document.getElementById("a-weak"),
+    EXHAUSTED: document.getElementById("a-ex"),
+    SAFE: document.getElementById("a-safe")
+};
+
+/* -------------------- UPLOAD VIDEO -------------------- */
+document.getElementById("upload-btn").onclick =
+    () => document.getElementById("file-input").click();
+
+document.getElementById("file-input").onchange = async (e) => {
+    let file = e.target.files[0];
+    if (!file) return;
+
+    let fd = new FormData();
+    fd.append("video", file);
+
+    await fetch("/upload/1", {method:"POST", body: fd});
+    videoFeed.src = "/video/1?refresh=" + Math.random();
+};
+
+/* -------------------- SWITCH CAMERA -------------------- */
+document.getElementById("cam-btn").onclick = async () => {
+    await fetch("/switch_camera/1", {method:"POST"});
+    videoFeed.src = "/video/1?refresh=" + Math.random();
+};
+
+/* -------------------- PAUSE BUTTON -------------------- */
+let paused = false;
+document.getElementById("pause-btn").onclick = async () => {
+    if (!paused) {
+        paused = true;
+        document.getElementById("pause-icon").className = "fas fa-play";
+        await fetch("/pause/1", {method:"POST"});
+    } else {
+        paused = false;
+        document.getElementById("pause-icon").className = "fas fa-pause";
+        await fetch("/resume/1", {method:"POST"});
+    }
+};
+
+/* -------------------- MAIN MONITORING LOOP -------------------- */
+async function refreshVitals() {
+    const v = await fetch(api).then(r => r.json());
+
+    document.getElementById("pname").innerText = v.name;
+    document.getElementById("page").innerText  = "Age: " + v.age;
+    document.getElementById("proom").innerText = "Room: " + v.room;
+
+    document.getElementById("emotion").innerText = v.emotion;
+    document.getElementById("emoji").innerText =
+        {happy:"😊", sad:"😟", angry:"😠", fear:"😨", neutral:"😐"}[v.emotion] || "😐";
+
+    // Do not alert on first load
+    if (firstLoad) { firstLoad = false; return; }
+
+    if (v.alert === "SAFE") {
+        // reset everything
+        alertStart = null;
+        alarmPlaying = false;
+        videoPanel.classList.remove("alert-flash");
+        alertBox.className =
+            "bg-green-900/30 border border-green-500/40 p-4 rounded text-center mt-2";
+        alertText.innerText = "PATIENT SAFE";
+        return;
+    }
+
+    // Start counting delay
+    if (!alertStart) {
+        alertStart = Date.now();
+        return;
+    }
+
+    const elapsed = Date.now() - alertStart;
+
+    if (elapsed < DELAY) {
+        // Not enough time: DO NOT alert yet
+        return;
+    }
+
+    // After delay satisfied → Show alert visually & sound (no popup)
+    videoPanel.classList.add("alert-flash");
+    alertText.innerText = v.alert + " ALERT";
+    alertBox.className =
+        "bg-red-900/30 border border-red-500/40 p-4 rounded text-center mt-2";
+
+    if (!alarmPlaying) {
+        try { sounds[v.alert].play(); } catch(e){}
+        alarmPlaying = true;
+    }
+}
+
+/* fetch vitals every 350ms */
+setInterval(refreshVitals, 350);
+
+/* update history every 2s */
+setInterval(async () => {
+    const d = await fetch("/api/dashboard").then(r => r.json());
+    const me = d.find(p => p.id === 1);
+    if (!me) return;
+
+    document.getElementById("history").innerHTML = `
+        <div class="text-xs text-gray-400">Last update</div>
+        <div class="mt-2 text-sm">Alert: ${me.alert} • Motion: ${me.motion}</div>
+        <div class="text-sm">Emotion: ${me.emotion} • Cry: ${me.cry}</div>
+    `;
+}, 2000);
+</script>
+
+</body>
+</html>
