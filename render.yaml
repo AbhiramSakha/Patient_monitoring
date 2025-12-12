@@ -2,7 +2,7 @@ services:
   - type: web
     name: patient-monitoring
     env: python
-    plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
-    pythonVersion: "3.10.12"
+    envVars:
+      PYTHON_VERSION: 3.10.12
