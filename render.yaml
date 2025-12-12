@@ -5,4 +5,5 @@ services:
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
-      PYTHON_VERSION: 3.10.12
+      - key: PYTHON_VERSION
+        value: 3.10.12
