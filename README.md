@@ -58,4 +58,3 @@ This project is ideal for:
 Patient_monitoring/ │ ├── app.py                      # Main Flask application ├── cameras.py                  # Camera & video streaming logic ├── patient_logs.csv            # Patient monitoring logs ├── requirements.txt            # Python dependencies ├── runtime.txt                 # Runtime configuration │ ├── templates/                  # HTML templates │   ├── index.html │   └── dashboard.html │ ├── static/ │   └── voice/                  # Audio & voice alert files │ ├── uploads/                    # Uploaded images/videos ├── MediGuard_Presentation.pptx # Project presentation └── README.md                   # Documentation
 
 
-
