@@ -1,4 +1,3 @@
-
 # 🧑‍⚕️ Patient Monitoring System  
 
 <p align="center">
